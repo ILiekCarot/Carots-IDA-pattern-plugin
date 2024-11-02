@@ -8,6 +8,13 @@ Pattern searches are composed of chained operations:
 - `;` - Separate multiple pattern searches
 - `[...]` - Comments or modifiers (e.g., [silent])
 
+## Auto-Call Feature
+The plugin automatically adds a call() operation when:
+- The last operation in a chain is sub(), xref(), or line()
+- The operation isn't followed by arg()
+
+This means `string("test"):xref(0)` automatically finds the function being called, equivalent to the old `string("test"):xref(0):call()`
+
 ## Operations
 
 ### String Search
@@ -25,8 +32,8 @@ ln xref(n)
 ```
 Gets the nth cross-reference to an address.
 - **Input**: Index number (0-based)
-- **Returns**: Line address of the xref
-- **Example**: `string("test"):xref(0) [get first xref]`
+- **Returns**: Line address of the xref (automatically gets called function if last operation)
+- **Example**: `string("test"):xref(0) [get first xref's function]`
 
 ### Function Container
 ```
@@ -34,7 +41,7 @@ ln sub()
 ```
 Gets the function containing the current line.
 - **Input**: None
-- **Returns**: Function start address
+- **Returns**: Function start address (automatically gets called function if last operation)
 - **Example**: `string("test"):xref(0):sub() [get function containing xref]`
 
 ### Line Offset
@@ -43,8 +50,8 @@ ln line(n)
 ```
 Moves n lines relative to current position.
 - **Input**: Number (positive = forward, negative = backward)
-- **Returns**: Line address at offset
-- **Example**: `string("test"):xref(0):line(-2) [two lines up]`
+- **Returns**: Line address at offset (automatically gets called function if last operation)
+- **Example**: `string("test"):xref(0):line(-2) [two lines up, get function]`
 
 ### Decompile
 ```
@@ -79,10 +86,32 @@ Prints the result of a pattern search.
   [silent]print(string("test"):xref(0))
   ```
 
+## Plugin API
+Other plugins can use CarotPattern by importing and using the execute_pattern function:
+
+```python
+import carotpattern
+
+result = carotpattern.execute_pattern('string("test"):xref(0)')
+if result['error'] is None:
+    print(f"Found: {result['response']}")
+```
+
+### Return Format
+The execute_pattern function returns a dictionary with:
+```python
+{
+    'response': "sub_12345",     # Result (function name, argument value, etc)
+    'type': "sub",              # Type of result (sub, arg, etc)
+    'error': None,              # Error message if failed
+    'args': ["__int64", "const char*"]  # Function arguments if available
+}
+```
+
 ## Examples
 ```python
 # Find luaL_register function in Roblox
-string("_LOADED"):xref(0):sub() [find function containing second xref]
+string("_LOADED"):xref(0):sub() [automatically gets function]
 
 # Print function argument without showing window
 [silent]print(string("test"):xref(0):arg(1))
@@ -93,6 +122,6 @@ string("func1"):xref(0); string("func2"):xref(0)
 # Get decompiled function with argument
 string("test"):xref(0):decompile():arg(1)
 
-# Chain multiple xrefs
-string("something"):xref(0):sub():xref(0):sub()
+# Chain multiple xrefs (auto-call applies to last operation)
+string("something"):xref(0):sub():xref(0)
 ```
